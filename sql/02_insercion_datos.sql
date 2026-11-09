@@ -1,7 +1,16 @@
+-- =====================================================================
+-- Sistema de Gestión de Pedidos para Clientes Comerciales de PROTENAT
+-- Base de datos: bd_protenat (MySQL 8)
+-- Parte 2: inserción de datos de prueba. Ejecutar después de 01.
+-- Corresponde a la sección 15.4.3 del informe.
+-- =====================================================================
+
 USE bd_protenat;
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- =====================================================================
 -- 2) INSERCIÓN DE DATOS DE PRUEBA
+-- =====================================================================
 -- Productos y presentaciones tomados del catálogo de PROTENAT; usuarios,
 -- clientes, pedidos e importes son datos de prueba.
 

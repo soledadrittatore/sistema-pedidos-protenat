@@ -4,7 +4,8 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
-import com.protenat.pedidos.conexion.ConexionBD;
+import com.protenat.pedidos.persistencia.ConexionBD;
+import com.protenat.pedidos.persistencia.FabricaDAO;
 import com.protenat.pedidos.excepciones.BaseDatosException;
 import com.protenat.pedidos.presentacion.InterfazLogin;
 import com.protenat.pedidos.util.Registro;
@@ -32,11 +33,9 @@ public class Main {
 
         SwingUtilities.invokeLater(() -> {
             try {
-                if (!conexionBD.probarConexion()) {
-                    throw new BaseDatosException("El servidor MySQL no responde", null);
-                }
+                conexionBD.verificarConexion();
 
-                new InterfazLogin(conexionBD).setVisible(true);
+                new InterfazLogin(new FabricaDAO(conexionBD)).setVisible(true);
 
             } catch (BaseDatosException e) {
                 mostrarErrorConexion(e);

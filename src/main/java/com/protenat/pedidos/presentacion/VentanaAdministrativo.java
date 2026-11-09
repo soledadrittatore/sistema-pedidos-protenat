@@ -3,25 +3,31 @@ package com.protenat.pedidos.presentacion;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 
-import com.protenat.pedidos.conexion.ConexionBD;
+import com.protenat.pedidos.persistencia.FabricaDAO;
 import com.protenat.pedidos.control.ControlCondicionComercial;
 import com.protenat.pedidos.control.ControlPedido;
 import com.protenat.pedidos.dominio.PersonalAdministrativo;
 
-/* Pantalla de Gestión administrativa (figura 11): bandeja de pedidos y condiciones comerciales. */
+/**
+ * Gestión administrativa (figura 11): bandeja de pedidos y condiciones
+ * comerciales.
+ */
 public class VentanaAdministrativo extends VentanaPrincipal {
 
     static final String BANDEJA = "Pedidos recibidos";
     static final String CONDICIONES = "Condiciones comerciales";
 
-    public VentanaAdministrativo(PersonalAdministrativo personal, ConexionBD conexionBD) {
-        super(personal, conexionBD);
+    public VentanaAdministrativo(PersonalAdministrativo personal, FabricaDAO fabricaDAO) {
+        super(personal, fabricaDAO);
     }
 
     @Override
     protected void agregarOpciones(JMenuBar barra) {
-        ControlCondicionComercial controlCondicion = new ControlCondicionComercial(getConexionBD());
-        ControlPedido controlPedido = new ControlPedido(getConexionBD(), controlCondicion);
+        FabricaDAO fabrica = getFabricaDAO();
+        ControlCondicionComercial controlCondicion = new ControlCondicionComercial(
+                fabrica.crearCondicionComercialDAO(), fabrica.crearProductoDAO());
+        ControlPedido controlPedido = new ControlPedido(fabrica.crearPedidoDAO(),
+                fabrica.crearProductoDAO(), controlCondicion);
 
         JMenu menu = new JMenu("Gestión");
         agregarPantalla(menu, BANDEJA, new InterfazPedidos(controlPedido));

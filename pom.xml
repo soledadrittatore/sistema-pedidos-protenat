@@ -6,7 +6,7 @@
 
     <groupId>com.protenat</groupId>
     <artifactId>sistema-pedidos-protenat</artifactId>
-    <version>1.0.0</version>
+    <version>2.0.0</version>
     <packaging>jar</packaging>
     <name>Sistema de Gestión de Pedidos PROTENAT</name>
 

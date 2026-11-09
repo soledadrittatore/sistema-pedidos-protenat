@@ -7,7 +7,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
-/* Formato de importes y fechas en pantalla. */
+/**
+ * Formato de importes y fechas en pantalla (sección 14.5.3).
+ */
 public final class Formato {
 
     private static final DecimalFormat MONEDA =

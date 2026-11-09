@@ -13,7 +13,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 
-/* Criterios visuales comunes a todas las pantallas */
+/* Criterios visuales comunes a todas las pantallas (sección 14.4). */
 public final class Estilo {
 
     public static final Color PRIMARIO = new Color(0x2E, 0x6B, 0x4F);
@@ -24,7 +24,7 @@ public final class Estilo {
     private Estilo() {
     }
 
-    /* Encabezado con el nombre de la pantalla y una ayuda breve. */
+    /** Encabezado con el nombre de la pantalla y una ayuda breve. */
     public static JPanel encabezado(String titulo, String ayuda) {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(FONDO_TITULO);

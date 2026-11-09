@@ -1,3 +1,6 @@
+-- =====================================================================
+-- Sistema de Gestión de Pedidos para Clientes Comerciales de PROTENAT
+-- Base de datos: bd_protenat (MySQL 8)
 -- Contenido: 1) Creación de las tablas
 --            2) Inserción de datos de prueba
 --            3) Consultas asociadas a los casos de uso
@@ -6,6 +9,7 @@
 -- Las partes 4 y 5 se ejecutan dentro de una transacción que termina en
 -- ROLLBACK, para que la base vuelva a quedar con los datos de prueba.
 -- Para conservar esos cambios, reemplazar el ROLLBACK final por COMMIT.
+-- =====================================================================
 
 CREATE DATABASE IF NOT EXISTS bd_protenat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE bd_protenat;
@@ -14,7 +18,9 @@ SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 SET SQL_SAFE_UPDATES = 0;
 
 
--- 1) Creación de las tablas
+-- =====================================================================
+-- 1) CREACIÓN DE LAS TABLAS
+-- =====================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS detalle_pedido, pedido, producto, linea,
@@ -125,8 +131,9 @@ CREATE TABLE detalle_pedido (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 
-
--- 2) Inserción de datos de prueba
+-- =====================================================================
+-- 2) INSERCIÓN DE DATOS DE PRUEBA
+-- =====================================================================
 -- Productos y presentaciones tomados del catálogo de PROTENAT; usuarios,
 -- clientes, pedidos e importes son datos de prueba.
 
@@ -207,7 +214,9 @@ INSERT INTO detalle_pedido (id_detalle, id_pedido, id_producto, cantidad, precio
 (9, 4, 13, 1, 13000.00, 13000.00);
 
 
--- 3) Consultas asociadas a los casos de uso
+-- =====================================================================
+-- 3) CONSULTAS
+-- =====================================================================
 
 -- C1 (CU-02 Iniciar sesión): datos para validar el acceso y el perfil.
 SELECT id_usuario, email, activo, tipo_usuario
@@ -281,7 +290,9 @@ FROM pedido
 GROUP BY estado;
 
 
--- 4) Actualizaciones propias de los casos de uso
+-- =====================================================================
+-- 4) ACTUALIZACIONES PROPIAS DE LOS CASOS DE USO
+-- =====================================================================
 START TRANSACTION;
 
 -- A1 (CU-04 Gestionar pedido): se registran el encabezado y sus detalles
@@ -332,7 +343,9 @@ SELECT id_pedido, total, estado, estado_pago, estado_disponibilidad FROM pedido 
 SELECT * FROM condicion_comercial ORDER BY id_condicion;
 
 
--- 5) Borrado de datos
+-- =====================================================================
+-- 5) BORRADO DE DATOS
+-- =====================================================================
 
 -- B1 Baja lógica de un producto: tiene pedidos asociados, por eso no se
 -- borra; se marca inactivo y deja de aparecer en el catálogo (C2).

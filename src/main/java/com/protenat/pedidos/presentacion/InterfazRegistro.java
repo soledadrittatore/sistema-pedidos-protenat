@@ -20,7 +20,9 @@ import com.protenat.pedidos.dominio.Cliente;
 import com.protenat.pedidos.excepciones.BaseDatosException;
 import com.protenat.pedidos.excepciones.ValidacionException;
 
-/* CU-01 Registrarse: formulario de alta de un cliente comercial. */
+/**
+ * CU-01 Registrarse: formulario de alta de un cliente comercial.
+ */
 public class InterfazRegistro extends JDialog {
 
     private final ControlLogin controlLogin;

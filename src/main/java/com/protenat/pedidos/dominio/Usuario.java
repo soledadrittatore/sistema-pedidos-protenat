@@ -7,6 +7,7 @@ public abstract class Usuario {
     private String clave;
     private boolean activo;
 
+    // Constructor
     public Usuario(int idUsuario, String email, String clave, boolean activo) {
         this.idUsuario = idUsuario;
         this.email = email;
@@ -14,6 +15,7 @@ public abstract class Usuario {
         this.activo = activo;
     }
 
+    // Métodos de acceso
     public int getIdUsuario() {
         return idUsuario;
     }
@@ -46,6 +48,7 @@ public abstract class Usuario {
         this.activo = activo;
     }
 
+    // Compara la clave ingresada con la almacenada
     public boolean validarClave(String claveIngresada) {
         return clave != null && clave.equals(claveIngresada);
     }

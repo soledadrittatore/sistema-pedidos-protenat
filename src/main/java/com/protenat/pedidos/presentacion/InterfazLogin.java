@@ -14,25 +14,27 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
-import com.protenat.pedidos.conexion.ConexionBD;
+import com.protenat.pedidos.persistencia.FabricaDAO;
 import com.protenat.pedidos.control.ControlLogin;
 import com.protenat.pedidos.dominio.Usuario;
 import com.protenat.pedidos.excepciones.BaseDatosException;
 import com.protenat.pedidos.excepciones.ValidacionException;
 
-/* Pantalla Iniciar sesión. */
+/**
+ * CU-02 Iniciar sesión (figura 9). Es la primera pantalla de la aplicación.
+ */
 public class InterfazLogin extends JFrame {
 
-    private final ConexionBD conexionBD;
+    private final FabricaDAO fabricaDAO;
     private final ControlLogin controlLogin;
 
     private final JTextField txtEmail = new JTextField(22);
     private final JPasswordField txtClave = new JPasswordField(22);
 
-    public InterfazLogin(ConexionBD conexionBD) {
+    public InterfazLogin(FabricaDAO fabricaDAO) {
         super("PROTENAT - Acceso al sistema");
-        this.conexionBD = conexionBD;
-        this.controlLogin = new ControlLogin(conexionBD);
+        this.fabricaDAO = fabricaDAO;
+        this.controlLogin = new ControlLogin(fabricaDAO.crearUsuarioDAO());
         construir();
     }
 
@@ -65,7 +67,7 @@ public class InterfazLogin extends JFrame {
         JButton btnRegistrarme = new JButton("Registrarme");
         btnIngresar.addActionListener(e -> ingresar());
         btnRegistrarme.addActionListener(e -> new InterfazRegistro(this, controlLogin).setVisible(true));
-        getRootPane().setDefaultButton(btnIngresar); 
+        getRootPane().setDefaultButton(btnIngresar); // Enter = Ingresar
 
         JPanel botones = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         botones.add(btnRegistrarme);
@@ -83,7 +85,7 @@ public class InterfazLogin extends JFrame {
         try {
             Usuario usuario = controlLogin.iniciarSesion(email, clave);
             // Polimorfismo: se abre la ventana del perfil sin preguntar la clase concreta
-            VentanaPrincipal principal = VentanaPrincipal.crearPara(usuario, conexionBD);
+            VentanaPrincipal principal = VentanaPrincipal.crearPara(usuario, fabricaDAO);
             principal.setVisible(true);
             txtClave.setText("");
             dispose();
@@ -95,7 +97,7 @@ public class InterfazLogin extends JFrame {
     }
 
     /** Lo usa la ventana principal al cerrar sesión. */
-    public static void mostrar(ConexionBD conexionBD) {
-        new InterfazLogin(conexionBD).setVisible(true);
+    public static void mostrar(FabricaDAO fabricaDAO) {
+        new InterfazLogin(fabricaDAO).setVisible(true);
     }
 }

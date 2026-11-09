@@ -1,4 +1,4 @@
-package com.protenat.pedidos.conexion;
+package com.protenat.pedidos.persistencia;
 
 import com.protenat.pedidos.excepciones.BaseDatosException;
 
@@ -12,8 +12,10 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
 
-/* Crea las conexiones a MySQL a partir de config.properties. Cada operación pide una conexión nueva y la cierra con try-with-resources.*/
-
+/**
+ * Crea las conexiones a MySQL a partir de config.properties. Cada operación
+ * pide una conexión nueva y la cierra con try-with-resources.
+ */
 public final class ConexionBD {
 
     private static final String ARCHIVO = "config.properties";
@@ -46,7 +48,7 @@ public final class ConexionBD {
         return ConexionBD.class.getClassLoader().getResourceAsStream(ARCHIVO);
     }
 
-    /* Devuelve otra opción de config.properties, en mi caso, ui.escala. */
+    /** Devuelve otra opción de config.properties, por ejemplo ui.escala. */
     public String getPropiedad(String clave, String porDefecto) {
         return props.getProperty(clave, porDefecto).trim();
     }
@@ -59,12 +61,17 @@ public final class ConexionBD {
         }
     }
 
-    /* Se usa al iniciar la aplicación para avisar si el servidor no responde. */
-    public boolean probarConexion() {
+    /**
+     * Comprueba que el servidor responda. Si no, lanza la excepción con la
+     * causa de MySQL, para que quede registrada en protenat.log.
+     */
+    public void verificarConexion() throws BaseDatosException {
         try (Connection c = obtenerConexion()) {
-            return c.isValid(3);
-        } catch (BaseDatosException | SQLException e) {
-            return false;
+            if (!c.isValid(3)) {
+                throw new BaseDatosException("El servidor MySQL no responde", null);
+            }
+        } catch (SQLException e) {
+            throw new BaseDatosException("El servidor MySQL no responde: " + e.getMessage(), e);
         }
     }
 }

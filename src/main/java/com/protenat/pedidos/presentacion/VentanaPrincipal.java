@@ -12,35 +12,39 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 
-import com.protenat.pedidos.conexion.ConexionBD;
+import com.protenat.pedidos.persistencia.FabricaDAO;
 import com.protenat.pedidos.dominio.Cliente;
 import com.protenat.pedidos.dominio.PersonalAdministrativo;
 import com.protenat.pedidos.dominio.Usuario;
 
-/* Ventana principal después de iniciar sesión. Es abstracta: define la barra
+/**
+ * Ventana principal después de iniciar sesión. Es abstracta: define la barra
  * de menú, el área de contenido y la opción Sesión, y cada subclase agrega las
- * opciones de su perfil.
+ * opciones de su perfil (RNF-04).
  */
 public abstract class VentanaPrincipal extends JFrame {
 
     private final Usuario usuario;
-    private final ConexionBD conexionBD;
+    private final FabricaDAO fabricaDAO;
     private final CardLayout tarjetas = new CardLayout();
     private final JPanel contenido = new JPanel(tarjetas);
 
-    protected VentanaPrincipal(Usuario usuario, ConexionBD conexionBD) {
+    protected VentanaPrincipal(Usuario usuario, FabricaDAO fabricaDAO) {
         super("PROTENAT - Sistema de Gestión de Pedidos");
         this.usuario = usuario;
-        this.conexionBD = conexionBD;
+        this.fabricaDAO = fabricaDAO;
     }
 
-    /* Se crea la ventana de acuerdo al perfil del usuario conoce el tipo VentanaPrincipal (polimorfismo).  */
-    public static VentanaPrincipal crearPara(Usuario usuario, ConexionBD conexionBD) {
+    /**
+     * Crea la ventana que corresponde al perfil del usuario. Quien la llama solo
+     * conoce el tipo VentanaPrincipal (polimorfismo).
+     */
+    public static VentanaPrincipal crearPara(Usuario usuario, FabricaDAO fabricaDAO) {
         VentanaPrincipal ventana;
         if (usuario instanceof Cliente) {
-            ventana = new VentanaCliente((Cliente) usuario, conexionBD);
+            ventana = new VentanaCliente((Cliente) usuario, fabricaDAO);
         } else if (usuario instanceof PersonalAdministrativo) {
-            ventana = new VentanaAdministrativo((PersonalAdministrativo) usuario, conexionBD);
+            ventana = new VentanaAdministrativo((PersonalAdministrativo) usuario, fabricaDAO);
         } else {
             throw new IllegalArgumentException("Tipo de usuario no soportado: " + usuario.getTipoUsuario());
         }
@@ -48,10 +52,10 @@ public abstract class VentanaPrincipal extends JFrame {
         return ventana;
     }
 
-    /* Cada perfil agrega su menú y sus pantallas. */
+    /** Cada perfil agrega su menú y sus pantallas. */
     protected abstract void agregarOpciones(JMenuBar barra);
 
-    /* Pantalla que se muestra al ingresar. */
+    /** Pantalla que se muestra al ingresar. */
     protected abstract String pantallaInicial();
 
     private void construir() {
@@ -80,7 +84,7 @@ public abstract class VentanaPrincipal extends JFrame {
         JMenuItem salir = new JMenuItem("Salir");
         cerrar.addActionListener(e -> {
             dispose();
-            InterfazLogin.mostrar(conexionBD);
+            InterfazLogin.mostrar(fabricaDAO);
         });
         salir.addActionListener(e -> System.exit(0));
         menu.add(cerrar);
@@ -89,7 +93,7 @@ public abstract class VentanaPrincipal extends JFrame {
         return menu;
     }
 
-    /* Agrega una pantalla y una opción de menú que la muestra. */
+    /** Agrega una pantalla y una opción de menú que la muestra. */
     protected void agregarPantalla(JMenu menu, String nombre, PantallaBase pantalla) {
         contenido.add(pantalla, nombre);
         JMenuItem opcion = new JMenuItem(nombre);
@@ -106,8 +110,8 @@ public abstract class VentanaPrincipal extends JFrame {
         }
     }
 
-    protected ConexionBD getConexionBD() {
-        return conexionBD;
+    protected FabricaDAO getFabricaDAO() {
+        return fabricaDAO;
     }
 
     public Usuario getUsuario() {

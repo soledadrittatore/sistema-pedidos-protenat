@@ -1,9 +1,18 @@
+-- =====================================================================
+-- Sistema de Gestión de Pedidos para Clientes Comerciales de PROTENAT
+-- Base de datos: bd_protenat (MySQL 8)
+-- Parte 1: creación de la base de datos y de las tablas
+-- Corresponde a la sección 15.4.2 del informe.
+-- =====================================================================
+
 
 CREATE DATABASE IF NOT EXISTS bd_protenat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE bd_protenat;
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- =====================================================================
 -- 1) CREACIÓN DE LAS TABLAS
+-- =====================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS detalle_pedido, pedido, producto, linea,

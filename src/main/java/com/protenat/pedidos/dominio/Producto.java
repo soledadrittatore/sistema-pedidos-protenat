@@ -14,6 +14,7 @@ public class Producto {
     private boolean activo;
     private Linea linea;
 
+    // Constructor
     public Producto(
             int idProducto,
             String codigo,
@@ -36,6 +37,7 @@ public class Producto {
         this.linea = linea;
     }
 
+    // Getters y setters
     public int getIdProducto() {
         return idProducto;
     }

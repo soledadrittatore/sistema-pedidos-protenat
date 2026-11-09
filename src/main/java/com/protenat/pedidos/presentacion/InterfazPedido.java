@@ -19,18 +19,22 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingUtilities;
 
 import com.protenat.pedidos.control.ControlPedido;
 import com.protenat.pedidos.dominio.Cliente;
 import com.protenat.pedidos.dominio.DetallePedido;
 import com.protenat.pedidos.dominio.Pedido;
 import com.protenat.pedidos.dominio.Producto;
+import com.protenat.pedidos.excepciones.ArchivoException;
 import com.protenat.pedidos.excepciones.BaseDatosException;
 import com.protenat.pedidos.excepciones.ValidacionException;
 import com.protenat.pedidos.util.Formato;
 
-/* CU-03 Consultar productos, CU-04 Gestionar pedido y CU-10 Validar
- * condiciones comerciales (figura 10). */
+/**
+ * CU-03 Consultar productos, CU-04 Gestionar pedido y CU-10 Validar
+ * condiciones comerciales (figura 10).
+ */
 public class InterfazPedido extends PantallaBase {
 
     private static final String[] CRITERIOS = {"Código", "Nombre", "Precio"};
@@ -58,6 +62,7 @@ public class InterfazPedido extends PantallaBase {
     private final JLabel lblMinimo = new JLabel();
     private final JLabel lblFaltante = new JLabel();
     private final JButton btnRevisar = Estilo.botonPrincipal("Revisar pedido");
+    private boolean borradorConsultado; // se ofrece recuperarlo una sola vez por sesión
 
     public InterfazPedido(Cliente cliente, ControlPedido controlPedido, Runnable irAMisPedidos) {
         super("Catálogo y pedido en curso",
@@ -105,9 +110,11 @@ public class InterfazPedido extends PantallaBase {
         JButton btnQuitar = new JButton("Quitar producto");
         JButton btnDeshacer = new JButton("Deshacer último cambio");
         JButton btnCancelar = new JButton("Cancelar pedido");
+        JButton btnBorrador = new JButton("Guardar borrador");
         barraPedido.add(btnQuitar);
         barraPedido.add(btnDeshacer);
         barraPedido.add(btnCancelar);
+        barraPedido.add(btnBorrador);
         barraPedido.add(btnRevisar);
         panelPedido.add(barraPedido, BorderLayout.SOUTH);
 
@@ -124,6 +131,7 @@ public class InterfazPedido extends PantallaBase {
         btnQuitar.addActionListener(e -> quitar());
         btnDeshacer.addActionListener(e -> deshacer());
         btnCancelar.addActionListener(e -> cancelar());
+        btnBorrador.addActionListener(e -> guardarBorrador());
         btnRevisar.addActionListener(e -> revisarYConfirmar());
     }
 
@@ -142,9 +150,47 @@ public class InterfazPedido extends PantallaBase {
             Mensajes.mostrar(this, e);
         }
         refrescarPedido();
+        // Se pregunta después de que la ventana se muestra
+        SwingUtilities.invokeLater(this::ofrecerBorrador);
     }
 
-    /* Catálogo de productos: ordenación y búsqueda */
+    // ---- Borrador guardado en archivo ----
+
+    private void guardarBorrador() {
+        try {
+            controlPedido.guardarBorrador(pedido);
+            Mensajes.informar(this, "Guardamos tu pedido sin enviar. La próxima vez que ingreses "
+                    + "vas a poder recuperarlo.");
+        } catch (ValidacionException | ArchivoException e) {
+            Mensajes.mostrar(this, e);
+        }
+    }
+
+    // Al entrar al catálogo, si hay un borrador guardado ofrece recuperarlo
+    private void ofrecerBorrador() {
+        if (borradorConsultado || pedido == null || !pedido.estaVacio()
+                || !controlPedido.hayBorrador(cliente)) {
+            return;
+        }
+        borradorConsultado = true;
+        try {
+            if (!Mensajes.confirmar(this, "Tenés un pedido sin enviar guardado el "
+                    + controlPedido.fechaBorrador(cliente) + ".\n¿Querés recuperarlo?")) {
+                controlPedido.descartarBorrador(cliente);
+                return;
+            }
+            List<String> avisos = controlPedido.recuperarBorrador(pedido, catalogo);
+            refrescarPedido();
+            if (!avisos.isEmpty()) {
+                Mensajes.advertir(this, "Algunos productos no se recuperaron:\n- "
+                        + String.join("\n- ", avisos));
+            }
+        } catch (ArchivoException e) {
+            Mensajes.mostrar(this, e);
+        }
+    }
+
+    // ---- Catálogo: ordenación y búsqueda ----
 
     private void ordenar() {
         Comparator<Producto> criterio;
@@ -180,6 +226,8 @@ public class InterfazPedido extends PantallaBase {
             Mensajes.mostrar(this, e);
         }
     }
+
+    // ---- Pedido en curso ----
 
     private void agregar() {
         int fila = tablaCatalogo.getSelectedRow();
@@ -241,7 +289,7 @@ public class InterfazPedido extends PantallaBase {
         lblFaltante.setText(faltante.signum() > 0
                 ? "Te faltan " + Formato.moneda(faltante)
                 : "Importe mínimo alcanzado");
-        // Revisar pedido solo se habilita cuando se cumplen las condiciones 
+        // Revisar pedido solo se habilita cuando se cumplen las condiciones (14.5.1)
         btnRevisar.setEnabled(!pedido.estaVacio() && faltante.signum() == 0);
     }
 

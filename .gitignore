@@ -5,3 +5,5 @@ protenat.log*
 .idea/
 *.iml
 .DS_Store
+borradores/
+*.log*

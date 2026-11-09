@@ -13,6 +13,7 @@ public class Linea {
         this.descripcion = descripcion;
     }
 
+    // Getters y setters
     public int getIdLinea() {
         return idLinea;
     }

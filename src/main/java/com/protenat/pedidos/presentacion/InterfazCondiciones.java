@@ -20,9 +20,7 @@ import com.protenat.pedidos.excepciones.BaseDatosException;
 import com.protenat.pedidos.excepciones.ValidacionException;
 import com.protenat.pedidos.util.Formato;
 
-/**
- * CU-09 Gestionar condiciones comerciales, CU-11 Modificar importe mínimo de
- * compra y CU-12 Modificar cantidad máxima por producto.
+/* CU-09 Gestionar condiciones comerciales, CU-11 Modificar importe mínimo de compra y CU-12 Modificar cantidad máxima por producto.
  */
 public class InterfazCondiciones extends PantallaBase {
 
@@ -36,6 +34,8 @@ public class InterfazCondiciones extends PantallaBase {
     private final TablaSoloLectura modelo =
             new TablaSoloLectura("Código", "Producto", "Línea", "Presentación", "Precio", "Cantidad máxima");
     private final JTable tabla = Estilo.tabla(modelo);
+    private final TablaSoloLectura modeloHistorial =
+            new TablaSoloLectura("Desde", "Importe mínimo", "Situación");
 
     public InterfazCondiciones(ControlCondicionComercial controlCondicion, ControlPedido controlPedido) {
         super("Condiciones comerciales",
@@ -51,7 +51,8 @@ public class InterfazCondiciones extends PantallaBase {
         filaImporte.add(new JLabel("    Nuevo importe: $"));
         filaImporte.add(txtImporte);
         filaImporte.add(btnImporte);
-        importe.add(filaImporte, BorderLayout.CENTER);
+        importe.add(filaImporte, BorderLayout.NORTH);
+        importe.add(Estilo.desplazable(Estilo.tabla(modeloHistorial), 96), BorderLayout.CENTER);
 
         JPanel cantidades = Estilo.titulado("Cantidad máxima por producto (CU-12)");
         cantidades.add(Estilo.desplazable(tabla, 300), BorderLayout.CENTER);
@@ -77,6 +78,12 @@ public class InterfazCondiciones extends PantallaBase {
             CondicionComercial vigente = controlCondicion.consultarCondiciones();
             lblVigente.setText("Vigente: " + Formato.moneda(vigente.getImporteMinimoCompra())
                     + " desde " + vigente.getFechaDesde().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            modeloHistorial.vaciar();
+            for (CondicionComercial c : controlCondicion.consultarHistorial()) {
+                modeloHistorial.addRow(new Object[] {
+                    c.getFechaDesde().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                    Formato.moneda(c.getImporteMinimoCompra()), c.isActivo() ? "Vigente" : "Anterior"});
+            }
             productos = controlPedido.consultarProductos();
             modelo.vaciar();
             for (Producto p : productos) {
@@ -123,7 +130,7 @@ public class InterfazCondiciones extends PantallaBase {
         }
     }
 
-    /* Convierte el texto en número; si no es válido lanza la excepción con MSG-15 */
+    // Convierte el texto en número; si no es válido lanza la excepción con MSG-15
     private BigDecimal leerImporte(String texto) throws ValidacionException {
         try {
             String limpio = texto.trim().replace(".", "").replace(",", ".");

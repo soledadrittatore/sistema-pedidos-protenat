@@ -3,12 +3,14 @@ package com.protenat.pedidos.presentacion;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 
-import com.protenat.pedidos.conexion.ConexionBD;
+import com.protenat.pedidos.persistencia.FabricaDAO;
 import com.protenat.pedidos.control.ControlCondicionComercial;
 import com.protenat.pedidos.control.ControlPedido;
 import com.protenat.pedidos.dominio.Cliente;
 
-/* Pantalla portal del Cliente: catálogo, pedido en curso y mis pedidos.*/
+/**
+ * Portal del Cliente (figura 10): catálogo, pedido en curso y mis pedidos.
+ */
 public class VentanaCliente extends VentanaPrincipal {
 
     static final String CATALOGO = "Catálogo y nuevo pedido";
@@ -16,15 +18,18 @@ public class VentanaCliente extends VentanaPrincipal {
 
     private final Cliente cliente;
 
-    public VentanaCliente(Cliente cliente, ConexionBD conexionBD) {
-        super(cliente, conexionBD);
+    public VentanaCliente(Cliente cliente, FabricaDAO fabricaDAO) {
+        super(cliente, fabricaDAO);
         this.cliente = cliente;
     }
 
     @Override
     protected void agregarOpciones(JMenuBar barra) {
-        ControlPedido controlPedido = new ControlPedido(getConexionBD(),
-                new ControlCondicionComercial(getConexionBD()));
+        FabricaDAO fabrica = getFabricaDAO();
+        ControlCondicionComercial controlCondicion = new ControlCondicionComercial(
+                fabrica.crearCondicionComercialDAO(), fabrica.crearProductoDAO());
+        ControlPedido controlPedido = new ControlPedido(fabrica.crearPedidoDAO(),
+                fabrica.crearProductoDAO(), controlCondicion);
 
         JMenu menu = new JMenu("Pedidos");
         agregarPantalla(menu, CATALOGO, new InterfazPedido(cliente, controlPedido,

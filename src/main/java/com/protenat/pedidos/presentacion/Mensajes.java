@@ -4,12 +4,15 @@ import java.awt.Component;
 
 import javax.swing.JOptionPane;
 
+import com.protenat.pedidos.excepciones.ArchivoException;
 import com.protenat.pedidos.excepciones.BaseDatosException;
 import com.protenat.pedidos.excepciones.ValidacionException;
 import com.protenat.pedidos.util.Registro;
 
-/* Muestra mensajes con cuadros de diálogo JOptionPane
-  del tipo que corresponde: error, advertencia, información o confirmación. */
+/**
+ * Muestra los mensajes de la sección 14.5.2 con cuadros de diálogo JOptionPane
+ * del tipo que corresponde: error, advertencia, información o confirmación.
+ */
 public final class Mensajes {
 
     private static final String TITULO = "PROTENAT";
@@ -43,6 +46,10 @@ public final class Mensajes {
     public static void mostrar(Component padre, Exception e) {
         if (e instanceof ValidacionException) {
             advertir(padre, e.getMessage());
+        } else if (e instanceof ArchivoException) {
+            Registro.error(e.getMessage(), e.getCause());
+            error(padre, "No se pudo leer o guardar el archivo. Revisá que la carpeta exista "
+                    + "y que tengas permiso de escritura.");
         } else if (e instanceof BaseDatosException) {
             Registro.error(e.getMessage(), e.getCause());
             error(padre, ((BaseDatosException) e).getMensajeUsuario());

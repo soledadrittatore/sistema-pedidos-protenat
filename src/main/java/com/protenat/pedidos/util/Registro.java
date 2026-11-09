@@ -6,9 +6,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
-/*
+/**
  * Registra los errores técnicos en el archivo protenat.log. Al usuario solo se
- * le muestra un mensaje general.
+ * le muestra un mensaje general (RNF-06).
  */
 public final class Registro {
 

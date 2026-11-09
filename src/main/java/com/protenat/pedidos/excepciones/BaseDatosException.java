@@ -1,8 +1,7 @@
 package com.protenat.pedidos.excepciones;
 
-/* Se lanza cuando falla el acceso a la base de datos. Registra en el log la causa
-   técnica, SQLException pero el usuario solo ve el mensaje general MSG-16. */
-
+/*  Se lanza cuando falla el acceso a la base de datos. Conserva la causa
+    técnica (SQLException) para registrarla en el log */
 public class BaseDatosException extends Exception {
 
     public static final String MENSAJE_USUARIO =

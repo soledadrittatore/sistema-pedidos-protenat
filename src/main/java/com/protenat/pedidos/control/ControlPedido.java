@@ -1,12 +1,7 @@
 package com.protenat.pedidos.control;
 
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -15,44 +10,36 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 
-import com.protenat.pedidos.conexion.ConexionBD;
 import com.protenat.pedidos.dominio.Cliente;
 import com.protenat.pedidos.dominio.CondicionComercial;
 import com.protenat.pedidos.dominio.DetallePedido;
 import com.protenat.pedidos.dominio.EstadoPedido;
 import com.protenat.pedidos.dominio.EstadoVerificacion;
-import com.protenat.pedidos.dominio.Linea;
 import com.protenat.pedidos.dominio.Pedido;
 import com.protenat.pedidos.dominio.Producto;
+import com.protenat.pedidos.excepciones.ArchivoException;
 import com.protenat.pedidos.excepciones.BaseDatosException;
 import com.protenat.pedidos.excepciones.ValidacionException;
+import com.protenat.pedidos.persistencia.ArchivoBorrador;
+import com.protenat.pedidos.persistencia.ExportadorCSV;
+import com.protenat.pedidos.persistencia.PedidoDAO;
+import com.protenat.pedidos.persistencia.ProductoDAO;
 import com.protenat.pedidos.util.Formato;
 import com.protenat.pedidos.util.Ordenamiento;
 
-/* Coordina la gestión de pedidos: CU-03, CU-04 y CU-10 para el cliente, y
-   CU-05 a CU-08 para la consulta, verificación y resolución. */
+/**
+ * Coordina la gestión de pedidos: CU-03, CU-04 y CU-10 para el cliente, y
+ * CU-05 a CU-08 para la consulta, verificación y resolución.
+ */
 public class ControlPedido {
 
-    private static final String SQL_PRODUCTOS =
-            "SELECT p.id_producto, p.codigo, p.nombre, p.descripcion, p.presentacion, p.precio, "
-            + "p.cantidad_maxima, p.activo, l.id_linea, l.nombre AS linea, l.descripcion AS linea_desc "
-            + "FROM producto p INNER JOIN linea l ON l.id_linea = p.id_linea ";
-
-    private static final String SQL_PEDIDOS =
-            "SELECT p.id_pedido, p.fecha, p.total, p.estado, p.estado_pago, p.estado_disponibilidad, "
-            + "p.observaciones, c.id_cliente, c.id_usuario, c.cuit_cuil, c.razon_social, "
-            + "cc.id_condicion, cc.importe_minimo_compra, cc.fecha_desde, cc.activo "
-            + "FROM pedido p "
-            + "INNER JOIN cliente c ON c.id_cliente = p.id_cliente "
-            + "INNER JOIN condicion_comercial cc ON cc.id_condicion = p.id_condicion ";
-
-    /*  Criterios de ordenación del catálogo que ofrece la pantalla */
+    // Criterios de ordenación del catálogo que ofrece la pantalla
     public static final Comparator<Producto> POR_CODIGO = Comparator.comparing(Producto::getCodigo);
     public static final Comparator<Producto> POR_NOMBRE =
             Comparator.comparing(Producto::getNombre).thenComparing(Producto::getPresentacion);
     public static final Comparator<Producto> POR_PRECIO = Comparator.comparing(Producto::getPrecio);
-    
-    /*  Cada cambio del pedido en curso se guarda para poder deshacerlo */
+
+    // Cada cambio del pedido en curso se guarda para poder deshacerlo
     private static class Movimiento {
         private final Producto producto;
         private final int cantidadAnterior; // 0 = el producto no estaba en el pedido
@@ -63,47 +50,47 @@ public class ControlPedido {
         }
     }
 
-    private final ConexionBD conexionBD;
+    private final PedidoDAO pedidoDAO;
+    private final ProductoDAO productoDAO;
     private final ControlCondicionComercial controlCondicion;
+    private final ArchivoBorrador borrador;
+    private final ExportadorCSV exportador = new ExportadorCSV();
 
     private Pedido pedidoEnCurso;
     private final Deque<Movimiento> historial = new ArrayDeque<>(); // pila (LIFO)
 
-    public ControlPedido(ConexionBD conexionBD, ControlCondicionComercial controlCondicion) {
-        this.conexionBD = conexionBD;
+    /** Las dependencias son interfaces: en las pruebas se reemplazan por DAO en memoria. */
+    public ControlPedido(PedidoDAO pedidoDAO, ProductoDAO productoDAO,
+                         ControlCondicionComercial controlCondicion, ArchivoBorrador borrador) {
+        this.pedidoDAO = pedidoDAO;
+        this.productoDAO = productoDAO;
         this.controlCondicion = controlCondicion;
+        this.borrador = borrador;
     }
 
-   
-    /*  CU-03 Consultar productos
-       Productos activos, ordenados por código con ordenación por inserción */
+    public ControlPedido(PedidoDAO pedidoDAO, ProductoDAO productoDAO,
+                         ControlCondicionComercial controlCondicion) {
+        this(pedidoDAO, productoDAO, controlCondicion, new ArchivoBorrador());
+    }
+
+    // =====================================================================
+    // CU-03 Consultar productos
+    // =====================================================================
+
+    // Productos activos, ordenados por código con ordenación por inserción
     public List<Producto> consultarProductos() throws BaseDatosException {
-
-        List<Producto> productos = new ArrayList<>();
-
-        try (Connection con = conexionBD.obtenerConexion();
-             PreparedStatement ps = con.prepareStatement(SQL_PRODUCTOS + "WHERE p.activo = 1");
-             ResultSet rs = ps.executeQuery()) {
-
-            while (rs.next()) {
-                productos.add(crearProducto(rs));
-            }
-
-        } catch (SQLException e) {
-            throw new BaseDatosException("Error al consultar los productos", e);
-        }
-
+        List<Producto> productos = productoDAO.listarActivos(); // ArrayList: tamaño variable
         Ordenamiento.ordenarPorInsercion(productos, POR_CODIGO);
         return productos;
     }
 
-    /* Ordena el catálogo con el criterio que elige el usuario */
+    // Ordena el catálogo con el criterio que elige el usuario
     public void ordenarProductos(List<Producto> productos, Comparator<Producto> criterio,
-                                 boolean descendente) { 
+                                 boolean descendente) {
         Ordenamiento.ordenarPorInsercion(productos, descendente ? criterio.reversed() : criterio);
     }
 
-    /*  Busca un producto por código con búsqueda binaria (la lista se ordena antes) */
+    // Busca un producto por código con búsqueda binaria (la lista se ordena antes)
     public Producto buscarProducto(List<Producto> productos, String codigo)
             throws ValidacionException {
 
@@ -111,10 +98,13 @@ public class ControlPedido {
             throw new ValidacionException("Ingresá el código del producto que querés buscar.");
         }
 
+        // Se copia el catálogo a un arreglo ordenado por código: la búsqueda
+        // binaria necesita acceso directo por posición y el arreglo no cambia
         List<Producto> ordenados = new ArrayList<>(productos);
         Ordenamiento.ordenarPorInsercion(ordenados, POR_CODIGO);
+        Producto[] arreglo = ordenados.toArray(new Producto[0]);
 
-        Producto encontrado = Ordenamiento.busquedaBinaria(ordenados, codigo.trim(), Producto::getCodigo);
+        Producto encontrado = Ordenamiento.busquedaBinaria(arreglo, codigo.trim(), Producto::getCodigo);
         if (encontrado == null) {
             throw new ValidacionException("No existe un producto habilitado con el código "
                     + codigo.trim().toUpperCase() + ".");
@@ -122,9 +112,10 @@ public class ControlPedido {
         return encontrado;
     }
 
-    
-    /* CU-04 Gestionar pedido y CU-10 Validar condiciones comerciales */
- 
+    // =====================================================================
+    // CU-04 Gestionar pedido y CU-10 Validar condiciones comerciales
+    // =====================================================================
+
     public Pedido iniciarPedido(Cliente cliente) throws BaseDatosException {
         CondicionComercial vigente = controlCondicion.consultarCondiciones();
         pedidoEnCurso = new Pedido(cliente, vigente);
@@ -132,7 +123,7 @@ public class ControlPedido {
         return pedidoEnCurso;
     }
 
-    /*  CU-10 paso 3: la cantidad debe estar entre 1 y la cantidad máxima */
+    // CU-10 paso 3: la cantidad debe estar entre 1 y la cantidad máxima
     public boolean validarCantidad(Producto producto, int cantidad) {
 
         if (cantidad <= 0) {
@@ -142,13 +133,15 @@ public class ControlPedido {
         return cantidad <= producto.getCantidadMaxima();
     }
 
-    /* CU-10 paso 6: el total debe alcanzar o superar el importe mínimo */
+    // CU-10 paso 6: el total debe alcanzar o superar el importe mínimo
     public boolean validarImporteMinimo(Pedido pedido, CondicionComercial condicion) {
         return pedido.getTotal().compareTo(condicion.getImporteMinimoCompra()) >= 0;
     }
 
-    /* Incorpora el producto al pedido. Si ya estaba, suma la cantidad
-     * y valida el total contra la cantidad máxima (CU-10 pasos 2 a 4). */
+    /**
+     * Incorpora el producto al pedido en curso. Si ya estaba, suma la cantidad
+     * y valida el total contra la cantidad máxima (CU-10 pasos 2 a 4).
+     */
     public void agregarProducto(Pedido pedido, Producto producto, int cantidad)
             throws ValidacionException {
 
@@ -178,7 +171,7 @@ public class ControlPedido {
         historial.push(new Movimiento(producto, anterior));
     }
 
-    /*  CU-04 A3: quita un producto del pedido */
+    // CU-04 A3: quita un producto del pedido
     public void quitarProducto(Pedido pedido, String codigo) throws ValidacionException {
 
         DetallePedido detalle = pedido.buscarDetalle(codigo);
@@ -190,7 +183,7 @@ public class ControlPedido {
         pedido.eliminarDetalle(detalle);
     }
 
-    /* Deshace el último cambio tomándolo del tope de la pila */
+    // Deshace el último cambio tomándolo del tope de la pila
     public String deshacerUltimoCambio(Pedido pedido) throws ValidacionException {
 
         if (historial.isEmpty()) {
@@ -211,14 +204,14 @@ public class ControlPedido {
         return ultimo.producto.getCodigo() + " vuelve a " + ultimo.cantidadAnterior + " unidad(es).";
     }
 
-    /* Importe que le falta al pedido para llegar al mínimo (cero si ya lo alcanzó) */
+    // Importe que le falta al pedido para llegar al mínimo (cero si ya lo alcanzó)
     public BigDecimal calcularFaltante(Pedido pedido) {
         BigDecimal falta = pedido.getCondicionComercial().getImporteMinimoCompra()
                 .subtract(pedido.getTotal());
         return falta.max(BigDecimal.ZERO);
     }
 
-    /* CU-10 pasos 5 a 7, antes de mostrar el resumen */
+    // CU-10 pasos 5 a 7, antes de mostrar el resumen
     public void validarPedido(Pedido pedido) throws ValidacionException {
 
         if (pedido.estaVacio()) {
@@ -232,64 +225,16 @@ public class ControlPedido {
         }
     }
 
-    /* CU-04 pasos 11 a 13: valida y registra el pedido; devuelve su número */
+    // CU-04 pasos 11 a 13: valida y registra el pedido; devuelve su número
     public int generarPedido(Pedido pedido) throws ValidacionException, BaseDatosException {
         validarPedido(pedido);
-        registrarPedido(pedido);
+        pedidoDAO.registrar(pedido); // pedido y detalles en una misma transacción
         cancelarGestion();
+        descartarBorrador(pedido.getCliente());
         return pedido.getIdPedido();
     }
 
-    /* Registra el pedido y todos sus detalles en una misma transacción */
-    public void registrarPedido(Pedido pedido) throws BaseDatosException {
-
-        try (Connection con = conexionBD.obtenerConexion()) {
-
-            con.setAutoCommit(false);
-
-            try {
-                try (PreparedStatement ps = con.prepareStatement(
-                        "INSERT INTO pedido (id_cliente, id_condicion, fecha, total) VALUES (?, ?, ?, ?)",
-                        Statement.RETURN_GENERATED_KEYS)) {
-                    ps.setInt(1, pedido.getCliente().getIdCliente());
-                    ps.setInt(2, pedido.getCondicionComercial().getIdCondicion());
-                    ps.setTimestamp(3, Timestamp.valueOf(pedido.getFecha()));
-                    ps.setBigDecimal(4, pedido.getTotal());
-                    ps.executeUpdate();
-                    try (ResultSet rs = ps.getGeneratedKeys()) {
-                        rs.next();
-                        pedido.setIdPedido(rs.getInt(1));
-                    }
-                }
-
-                try (PreparedStatement ps = con.prepareStatement(
-                        "INSERT INTO detalle_pedido (id_pedido, id_producto, cantidad, precio_unitario, subtotal) "
-                        + "VALUES (?, ?, ?, ?, ?)")) {
-                    for (DetallePedido d : pedido.getDetalles()) {
-                        ps.setInt(1, pedido.getIdPedido());
-                        ps.setInt(2, d.getProducto().getIdProducto());
-                        ps.setInt(3, d.getCantidad());
-                        ps.setBigDecimal(4, d.getPrecioUnitario());
-                        ps.setBigDecimal(5, d.getSubtotal());
-                        ps.addBatch();
-                    }
-                    ps.executeBatch();
-                }
-
-                con.commit();
-
-            } catch (SQLException e) {
-                con.rollback(); // no queda un pedido sin sus detalles
-                pedido.setIdPedido(0);
-                throw e;
-            }
-
-        } catch (SQLException e) {
-            throw new BaseDatosException("Error al registrar el pedido", e);
-        }
-    }
-
-    /* CU-04 A4: se descarta el pedido en curso sin registrarlo */
+    // CU-04 A4: se descarta el pedido en curso sin registrarlo
     public void cancelarGestion() {
         pedidoEnCurso = null;
         historial.clear();
@@ -299,21 +244,21 @@ public class ControlPedido {
         return pedidoEnCurso;
     }
 
-    /* Consultar mis pedidos y Gestionar pedidos recibidos */
-    /* pedidos del cliente, del más reciente al más antiguo */
+    // =====================================================================
+    // CU-05 Consultar mis pedidos y CU-06 Gestionar pedidos recibidos
+    // =====================================================================
+
+    // CU-05: pedidos del cliente, del más reciente al más antiguo
     public List<Pedido> consultarPedidosCliente(Cliente cliente) throws BaseDatosException {
-        return listarPedidos("WHERE p.id_cliente = ? ORDER BY p.fecha DESC", cliente.getIdCliente());
+        return pedidoDAO.listarPorCliente(cliente.getIdCliente());
     }
 
     // CU-06: todos los pedidos o solo los de un estado
     public List<Pedido> consultarPedidos(EstadoPedido filtroEstado) throws BaseDatosException {
-        if (filtroEstado == null) {
-            return listarPedidos("ORDER BY p.fecha DESC", null);
-        }
-        return listarPedidos("WHERE p.estado = ? ORDER BY p.fecha DESC", filtroEstado.name());
+        return pedidoDAO.listar(filtroEstado);
     }
 
-    /* filtra por número de pedido o razón social (búsqueda secuencial) */
+    // CU-06: filtra por número de pedido o razón social (búsqueda secuencial)
     public List<Pedido> filtrarPedidos(List<Pedido> pedidos, String texto) {
 
         if (texto == null || texto.isBlank()) {
@@ -333,30 +278,41 @@ public class ControlPedido {
         return resultado;
     }
 
-    /* Pedidos pendientes, primero que llegó es el primero que atiende el personal administrativo. */
+    /**
+     * Pedidos pendientes como cola (FIFO): el primero que llegó es el primero
+     * que atiende el personal administrativo.
+     */
     public Queue<Pedido> obtenerColaPendientes() throws BaseDatosException {
         Queue<Pedido> cola = new LinkedList<>();
-        for (Pedido p : listarPedidos("WHERE p.estado = 'PENDIENTE' ORDER BY p.fecha ASC", null)) {
+        for (Pedido p : pedidoDAO.listarPendientesPorAntiguedad()) {
             cola.offer(p);
         }
         return cola;
     }
 
-    /*  Recupera un pedido con sus detalles */
+    // Recupera un pedido con sus detalles
     public Pedido consultarPedido(int idPedido) throws ValidacionException, BaseDatosException {
 
-        List<Pedido> lista = listarPedidos("WHERE p.id_pedido = ?", idPedido);
-        if (lista.isEmpty()) {
+        Pedido pedido = pedidoDAO.buscarPorId(idPedido);
+        if (pedido == null) {
             throw new ValidacionException("No existe el pedido N.° " + idPedido + ".");
         }
-
-        Pedido pedido = lista.get(0);
-        cargarDetalles(pedido);
         return pedido;
     }
 
-    
-    /* registra el resultado de las verificaciones y las observaciones */
+    /**
+     * Resumen de la bandeja: cantidad de pedidos por estado. El arreglo tiene
+     * una posición por estado, en el orden de EstadoPedido.values().
+     */
+    public int[] contarPedidosPorEstado() throws BaseDatosException {
+        return pedidoDAO.contarPorEstado();
+    }
+
+    // =====================================================================
+    // CU-07 Verificar pedido y CU-08 Resolver pedido
+    // =====================================================================
+
+    // CU-07: registra el resultado de las verificaciones y las observaciones
     public void verificarPedido(Pedido pedido, EstadoVerificacion estadoPago,
                                 EstadoVerificacion estadoDisponibilidad, String observaciones)
             throws ValidacionException, BaseDatosException {
@@ -365,23 +321,9 @@ public class ControlPedido {
             throw new ValidacionException("Solo se pueden verificar pedidos PENDIENTES.");
         }
 
-        try (Connection con = conexionBD.obtenerConexion();
-             PreparedStatement ps = con.prepareStatement(
-                     "UPDATE pedido SET estado_pago = ?, estado_disponibilidad = ?, observaciones = ? "
-                     + "WHERE id_pedido = ? AND estado = 'PENDIENTE'")) {
-
-            ps.setString(1, estadoPago.name());
-            ps.setString(2, estadoDisponibilidad.name());
-            ps.setString(3, observaciones);
-            ps.setInt(4, pedido.getIdPedido());
-
-            if (ps.executeUpdate() == 0) {
-                throw new ValidacionException("El pedido ya no está PENDIENTE; no se guardaron los cambios.");
-            }
-
-        } catch (SQLException e) {
-            throw new BaseDatosException("Error al registrar las verificaciones del pedido "
-                    + pedido.getIdPedido(), e);
+        if (!pedidoDAO.actualizarVerificaciones(pedido.getIdPedido(), estadoPago,
+                estadoDisponibilidad, observaciones)) {
+            throw new ValidacionException("El pedido ya no está PENDIENTE; no se guardaron los cambios.");
         }
 
         // El objeto se actualiza solo si la base se modificó
@@ -390,8 +332,9 @@ public class ControlPedido {
         pedido.setObservaciones(observaciones);
     }
 
-    /* solo se puede confirmar si pago y disponibilidad están
-       APROBADAS. Se informa primero el rechazo (A2) y después lo pendiente (A1).
+    /**
+     * CU-08 paso 4: solo se puede confirmar si pago y disponibilidad están
+     * APROBADAS. Se informa primero el rechazo (A2) y después lo pendiente (A1).
      */
     public void validarVerificaciones(Pedido pedido) throws ValidacionException {
 
@@ -407,18 +350,17 @@ public class ControlPedido {
         }
     }
 
-    /* CU-08: confirmar pedido */
+    // CU-08: confirmar pedido
     public void confirmarPedido(Pedido pedido) throws ValidacionException, BaseDatosException {
 
         verificarPendiente(pedido);
         validarVerificaciones(pedido);
 
         // El WHERE repite la regla en la base por si otro usuario cambió el pedido
-        actualizarEstado(pedido, EstadoPedido.CONFIRMADO, pedido.getObservaciones(),
-                "AND estado_pago = 'APROBADA' AND estado_disponibilidad = 'APROBADA'");
+        actualizarEstado(pedido, EstadoPedido.CONFIRMADO, pedido.getObservaciones(), true);
     }
 
-    /* rechazar pedido, con cualquier combinación de verificaciones */
+    // CU-08 A3: rechazar pedido, con cualquier combinación de verificaciones
     public void rechazarPedido(Pedido pedido, String motivo)
             throws ValidacionException, BaseDatosException {
 
@@ -426,7 +368,7 @@ public class ControlPedido {
 
         String observaciones = (motivo == null || motivo.isBlank())
                 ? pedido.getObservaciones() : motivo.trim();
-        actualizarEstado(pedido, EstadoPedido.RECHAZADO, observaciones, "");
+        actualizarEstado(pedido, EstadoPedido.RECHAZADO, observaciones, false);
     }
 
     private void verificarPendiente(Pedido pedido) throws ValidacionException {
@@ -437,128 +379,75 @@ public class ControlPedido {
     }
 
     private void actualizarEstado(Pedido pedido, EstadoPedido nuevoEstado, String observaciones,
-                                  String condicionExtra) throws ValidacionException, BaseDatosException {
+                                  boolean exigirAprobadas) throws ValidacionException, BaseDatosException {
 
-        try (Connection con = conexionBD.obtenerConexion()) {
-
-            con.setAutoCommit(false);
-
-            try (PreparedStatement ps = con.prepareStatement(
-                    "UPDATE pedido SET estado = ?, observaciones = ? "
-                    + "WHERE id_pedido = ? AND estado = 'PENDIENTE' " + condicionExtra)) {
-
-                ps.setString(1, nuevoEstado.name());
-                ps.setString(2, observaciones);
-                ps.setInt(3, pedido.getIdPedido());
-
-                if (ps.executeUpdate() == 0) {
-                    con.rollback();
-                    throw new ValidacionException("El pedido cambió mientras se resolvía. Consultalo nuevamente.");
-                }
-                con.commit();
-
-            } catch (SQLException e) {
-                con.rollback(); // se mantiene el estado anterior
-                throw e;
-            }
-
-        } catch (SQLException e) {
-            throw new BaseDatosException("Error al actualizar el estado del pedido " + pedido.getIdPedido(), e);
+        if (!pedidoDAO.actualizarEstado(pedido.getIdPedido(), nuevoEstado, observaciones, exigirAprobadas)) {
+            throw new ValidacionException("El pedido cambió mientras se resolvía. Consultalo nuevamente.");
         }
 
         pedido.setEstado(nuevoEstado);
         pedido.setObservaciones(observaciones);
     }
 
-  
-    private List<Pedido> listarPedidos(String filtro, Object parametro) throws BaseDatosException {
+    // =====================================================================
+    // Archivos: borrador del pedido en curso y exportación de la bandeja
+    // =====================================================================
 
-        List<Pedido> pedidos = new ArrayList<>();
-
-        try (Connection con = conexionBD.obtenerConexion();
-             PreparedStatement ps = con.prepareStatement(SQL_PEDIDOS + filtro)) {
-
-            if (parametro != null) {
-                ps.setObject(1, parametro);
-            }
-
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    pedidos.add(crearPedido(rs));
-                }
-            }
-
-        } catch (SQLException e) {
-            throw new BaseDatosException("Error al consultar los pedidos", e);
+    /** Guarda el pedido en curso en un archivo para terminarlo en otra sesión. */
+    public void guardarBorrador(Pedido pedido) throws ValidacionException, ArchivoException {
+        if (pedido.estaVacio()) {
+            throw new ValidacionException("El pedido no tiene productos para guardar.");
         }
-        return pedidos;
+        borrador.guardar(pedido);
     }
 
-    private void cargarDetalles(Pedido pedido) throws BaseDatosException {
+    public boolean hayBorrador(Cliente cliente) {
+        return borrador.existe(cliente.getIdCliente());
+    }
 
-        String sql = "SELECT d.id_detalle, d.cantidad, d.precio_unitario, "
-                + "p.id_producto, p.codigo, p.nombre, p.descripcion, p.presentacion, p.precio, "
-                + "p.cantidad_maxima, p.activo, l.id_linea, l.nombre AS linea, l.descripcion AS linea_desc "
-                + "FROM detalle_pedido d "
-                + "INNER JOIN producto p ON p.id_producto = d.id_producto "
-                + "INNER JOIN linea l ON l.id_linea = p.id_linea "
-                + "WHERE d.id_pedido = ? ORDER BY d.id_detalle";
+    public String fechaBorrador(Cliente cliente) throws ArchivoException {
+        return Formato.fechaHora(borrador.fechaGuardado(cliente.getIdCliente()));
+    }
 
-        try (Connection con = conexionBD.obtenerConexion();
-             PreparedStatement ps = con.prepareStatement(sql)) {
+    /**
+     * Carga en el pedido los productos del borrador. Cada producto vuelve a
+     * pasar por agregarProducto(), así se aplican el precio y la cantidad
+     * máxima vigentes. Devuelve los avisos de lo que no se pudo recuperar.
+     */
+    public List<String> recuperarBorrador(Pedido pedido, List<Producto> catalogo) throws ArchivoException {
 
-            ps.setInt(1, pedido.getIdPedido());
+        List<String> avisos = new ArrayList<>();
 
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    pedido.agregarDetalle(new DetallePedido(
-                            rs.getInt("id_detalle"),
-                            crearProducto(rs),
-                            rs.getInt("cantidad"),
-                            rs.getBigDecimal("precio_unitario")));
-                }
+        for (String[] linea : borrador.recuperar(pedido.getCliente().getIdCliente())) {
+            String codigo = linea[0];
+            try {
+                int cantidad = Integer.parseInt(linea[1]);
+                agregarProducto(pedido, buscarProducto(catalogo, codigo), cantidad);
+            } catch (NumberFormatException e) {
+                avisos.add(codigo + ": la cantidad guardada no es válida.");
+            } catch (ValidacionException e) {
+                avisos.add(codigo + ": " + e.getMessage());
             }
+        }
 
-        } catch (SQLException e) {
-            throw new BaseDatosException("Error al consultar el detalle del pedido " + pedido.getIdPedido(), e);
+        historial.clear(); // lo recuperado no se deshace de a un producto
+        return avisos;
+    }
+
+    public void descartarBorrador(Cliente cliente) {
+        try {
+            borrador.eliminar(cliente.getIdCliente());
+        } catch (ArchivoException e) {
+            // si no se puede borrar, al volver a ingresar se ofrece recuperarlo
         }
     }
 
-    private Producto crearProducto(ResultSet rs) throws SQLException {
-        Linea linea = new Linea(rs.getInt("id_linea"), rs.getString("linea"), rs.getString("linea_desc"));
-        return new Producto(
-                rs.getInt("id_producto"),
-                rs.getString("codigo"),
-                rs.getString("nombre"),
-                rs.getString("descripcion"),
-                rs.getString("presentacion"),
-                rs.getBigDecimal("precio"),
-                rs.getInt("cantidad_maxima"),
-                rs.getBoolean("activo"),
-                linea);
-    }
-
-    private Pedido crearPedido(ResultSet rs) throws SQLException {
-
-        Cliente cliente = new Cliente(rs.getInt("id_usuario"), null, null, true,
-                rs.getString("cuit_cuil"), rs.getString("razon_social"), null, null, null);
-        cliente.setIdCliente(rs.getInt("id_cliente"));
-
-        CondicionComercial condicion = new CondicionComercial(
-                rs.getInt("id_condicion"),
-                rs.getBigDecimal("importe_minimo_compra"),
-                rs.getDate("fecha_desde").toLocalDate(),
-                rs.getBoolean("activo"));
-
-        return new Pedido(
-                rs.getInt("id_pedido"),
-                cliente,
-                condicion,
-                rs.getTimestamp("fecha").toLocalDateTime(),
-                rs.getBigDecimal("total"),
-                EstadoPedido.valueOf(rs.getString("estado")),
-                EstadoVerificacion.valueOf(rs.getString("estado_pago")),
-                EstadoVerificacion.valueOf(rs.getString("estado_disponibilidad")),
-                rs.getString("observaciones"));
+    /** Exporta los pedidos que se ven en la bandeja a un archivo CSV. */
+    public int exportarPedidos(List<Pedido> pedidos, Path destino)
+            throws ValidacionException, ArchivoException {
+        if (pedidos.isEmpty()) {
+            throw new ValidacionException("No hay pedidos en la bandeja para exportar.");
+        }
+        return exportador.exportarPedidos(pedidos, destino);
     }
 }

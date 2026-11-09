@@ -22,7 +22,7 @@ class OrdenamientoTest {
 
     @Test
     void busquedaBinariaEncuentraYNoEncuentra() {
-        List<String> codigos = List.of("COL-001", "COL-002", "COL-005", "NUT-001", "PLE-002");
+        String[] codigos = {"COL-001", "COL-002", "COL-005", "NUT-001", "PLE-002"};
         assertEquals("NUT-001", Ordenamiento.busquedaBinaria(codigos, "nut-001", c -> c));
         assertNull(Ordenamiento.busquedaBinaria(codigos, "COL-003", c -> c));
     }

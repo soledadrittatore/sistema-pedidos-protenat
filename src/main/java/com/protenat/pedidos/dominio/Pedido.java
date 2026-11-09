@@ -19,7 +19,7 @@ public class Pedido {
     private String observaciones;
     private List<DetallePedido> detalles;
 
-    // Constructor para un pedido nuevo, todos los estados en PENDIENTE
+    // Constructor para un pedido nuevo (CU-04): todos los estados en PENDIENTE
     public Pedido(Cliente cliente, CondicionComercial condicionComercial) {
         this(0, cliente, condicionComercial, LocalDateTime.now(), BigDecimal.ZERO,
                 EstadoPedido.PENDIENTE, EstadoVerificacion.PENDIENTE,

@@ -15,7 +15,9 @@ import com.protenat.pedidos.excepciones.BaseDatosException;
 import com.protenat.pedidos.excepciones.ValidacionException;
 import com.protenat.pedidos.util.Formato;
 
-/* Pantalla Consultar mis pedidos. */
+/**
+ * CU-05 Consultar mis pedidos.
+ */
 public class InterfazMisPedidos extends PantallaBase {
 
     private final Cliente cliente;

@@ -6,12 +6,16 @@ import java.awt.GridBagConstraints;
 import java.awt.GridLayout;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
@@ -22,11 +26,15 @@ import com.protenat.pedidos.control.ControlPedido;
 import com.protenat.pedidos.dominio.EstadoPedido;
 import com.protenat.pedidos.dominio.EstadoVerificacion;
 import com.protenat.pedidos.dominio.Pedido;
+import com.protenat.pedidos.excepciones.ArchivoException;
 import com.protenat.pedidos.excepciones.BaseDatosException;
 import com.protenat.pedidos.excepciones.ValidacionException;
 import com.protenat.pedidos.util.Formato;
 
-/* CU-06 Gestionar pedidos recibidos, CU-07 Verificar pedido y CU-08 Resolver pedido */
+/**
+ * CU-06 Gestionar pedidos recibidos, CU-07 Verificar pedido y CU-08 Resolver
+ * pedido (figura 11).
+ */
 public class InterfazPedidos extends PantallaBase {
 
     private static final String TODOS = "Todos";
@@ -39,6 +47,7 @@ public class InterfazPedidos extends PantallaBase {
         EstadoPedido.PENDIENTE, EstadoPedido.CONFIRMADO, EstadoPedido.RECHAZADO});
     private final JTextField txtFiltro = new JTextField(14);
     private final JLabel lblCola = new JLabel();
+    private final JLabel lblResumen = new JLabel();
 
     private final TablaSoloLectura modelo = new TablaSoloLectura(
             "N.° pedido", "Cliente", "Fecha", "Total", "Estado", "Pago", "Disponibilidad");
@@ -60,7 +69,7 @@ public class InterfazPedidos extends PantallaBase {
     }
 
     private void construir() {
-        /* Bandeja con filtros */
+        // ---- Bandeja con filtros ----
         JPanel bandeja = Estilo.titulado("Bandeja de pedidos");
         JPanel filtros = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton btnFiltrar = new JButton("Aplicar filtros");
@@ -77,8 +86,14 @@ public class InterfazPedidos extends PantallaBase {
         filtros.add(lblCola);
         bandeja.add(filtros, BorderLayout.NORTH);
         bandeja.add(Estilo.desplazable(tabla, 170), BorderLayout.CENTER);
+        JPanel pie = new JPanel(new BorderLayout());
+        JButton btnExportar = new JButton("Exportar a CSV");
+        lblResumen.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 6, 0, 0));
+        pie.add(lblResumen, BorderLayout.WEST);
+        pie.add(btnExportar, BorderLayout.EAST);
+        bandeja.add(pie, BorderLayout.SOUTH);
 
-        /* Detalle, verificaciones y resolución */
+        // ---- Detalle, verificaciones y resolución ----
         JPanel inferior = new JPanel(new BorderLayout(6, 6));
         JPanel panelDetalle = Estilo.titulado("Detalle del pedido");
         panelDetalle.add(detalle, BorderLayout.CENTER);
@@ -120,7 +135,7 @@ public class InterfazPedidos extends PantallaBase {
         division.setResizeWeight(0.45);
         add(division, BorderLayout.CENTER);
 
-        /* Acciones */
+        // ---- Acciones ----
         btnFiltrar.addActionListener(e -> cargarBandeja());
         txtFiltro.addActionListener(e -> cargarBandeja());
         btnLimpiar.addActionListener(e -> {
@@ -129,6 +144,7 @@ public class InterfazPedidos extends PantallaBase {
             cargarBandeja();
         });
         btnSiguiente.addActionListener(e -> atenderSiguiente());
+        btnExportar.addActionListener(e -> exportar());
         tabla.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 seleccionar();
@@ -158,6 +174,7 @@ public class InterfazPedidos extends PantallaBase {
                     p.getEstadoPago(), p.getEstadoDisponibilidad()});
             }
             lblCola.setText("Pendientes en cola: " + controlPedido.obtenerColaPendientes().size());
+            mostrarResumen(controlPedido.contarPedidosPorEstado());
             seleccionado = null;
             detalle.mostrar(null);
             habilitarAcciones();
@@ -166,6 +183,41 @@ public class InterfazPedidos extends PantallaBase {
                         : "No hay pedidos que coincidan con los filtros. Modificalos o limpialos.");
             }
         } catch (BaseDatosException e) {
+            Mensajes.mostrar(this, e);
+        }
+    }
+
+    /**
+     * Arma el texto "Pendientes: 2 | Confirmados: 3 | Rechazados: 1" recorriendo
+     * en paralelo el arreglo de estados y el arreglo de cantidades.
+     */
+    private void mostrarResumen(int[] cantidades) {
+        EstadoPedido[] estados = EstadoPedido.values();
+        String[] etiquetas = {"Pendientes", "Confirmados", "Rechazados"};
+        StringBuilder sb = new StringBuilder("Total por estado:  ");
+        int total = 0;
+        for (int i = 0; i < estados.length; i++) {
+            sb.append(etiquetas[i]).append(": ").append(cantidades[i]).append("   ");
+            total += cantidades[i];
+        }
+        sb.append("Total: ").append(total);
+        lblResumen.setText(sb.toString());
+    }
+
+    // Guarda en un CSV los pedidos que se ven en la bandeja (con los filtros aplicados)
+    private void exportar() {
+        JFileChooser selector = new JFileChooser();
+        selector.setDialogTitle("Exportar pedidos a CSV");
+        selector.setSelectedFile(Path.of("pedidos_"
+                + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".csv").toFile());
+        if (selector.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        Path destino = selector.getSelectedFile().toPath();
+        try {
+            int cantidad = controlPedido.exportarPedidos(pedidosMostrados, destino);
+            Mensajes.informar(this, "Se exportaron " + cantidad + " pedidos a\n" + destino.toAbsolutePath());
+        } catch (ValidacionException | ArchivoException e) {
             Mensajes.mostrar(this, e);
         }
     }
@@ -249,7 +301,7 @@ public class InterfazPedidos extends PantallaBase {
         }
     }
 
-    /* Recarga la bandeja y vuelve a seleccionar el mismo pedido */
+    // Recarga la bandeja y vuelve a seleccionar el mismo pedido
     private void refrescarSeleccionado() {
         int id = seleccionado.getIdPedido();
         cargarBandeja();
@@ -261,8 +313,11 @@ public class InterfazPedidos extends PantallaBase {
         }
     }
 
-    /* Se deshabilitan los botones que no corresponden, solo un pedido
-       PENDIENTE se verifica o resuelve, y Confirmar exige pago y disponibilidad APROBADAS. */
+    /**
+     * Los botones que no corresponden se deshabilitan (14.5.1): solo un pedido
+     * PENDIENTE se verifica o resuelve, y Confirmar exige pago y disponibilidad
+     * APROBADAS.
+     */
     private void habilitarAcciones() {
         boolean pendiente = seleccionado != null && seleccionado.estaPendiente();
         boolean aprobadas = pendiente

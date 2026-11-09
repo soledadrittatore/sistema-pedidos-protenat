@@ -10,6 +10,7 @@ public class CondicionComercial {
     private LocalDate fechaDesde;
     private boolean activo;
 
+    // Constructor
     public CondicionComercial(
             int idCondicion,
             BigDecimal importeMinimoCompra,
@@ -22,6 +23,7 @@ public class CondicionComercial {
         this.activo = activo;
     }
 
+    // Getters y setters
     public int getIdCondicion() {
         return idCondicion;
     }

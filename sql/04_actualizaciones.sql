@@ -1,11 +1,21 @@
+-- =====================================================================
+-- Sistema de Gestión de Pedidos para Clientes Comerciales de PROTENAT
+-- Base de datos: bd_protenat (MySQL 8)
+-- Parte 4: actualizaciones propias de los casos de uso (A1 a A6).
+-- Se ejecutan en una transacción que termina en ROLLBACK, para que la base
+-- vuelva a quedar con los datos de prueba. Para conservar los cambios,
+-- reemplazar el ROLLBACK final por COMMIT.
+-- Corresponde a la sección 15.4.5 del informe.
+-- =====================================================================
+
 USE bd_protenat;
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- Workbench bloquea por defecto los UPDATE/DELETE sin clave en el WHERE.
 SET SQL_SAFE_UPDATES = 0;
 
-
+-- =====================================================================
 -- 4) ACTUALIZACIONES PROPIAS DE LOS CASOS DE USO
-
+-- =====================================================================
 START TRANSACTION;
 
 -- A1 (CU-04 Gestionar pedido): se registran el encabezado y sus detalles

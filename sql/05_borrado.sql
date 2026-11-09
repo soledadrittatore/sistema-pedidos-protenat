@@ -1,3 +1,12 @@
+-- =====================================================================
+-- Sistema de Gestión de Pedidos para Clientes Comerciales de PROTENAT
+-- Base de datos: bd_protenat (MySQL 8)
+-- Parte 5: borrado de datos (B1 a B3).
+-- Se ejecuta en una transacción que termina en ROLLBACK, para que la base
+-- vuelva a quedar con los datos de prueba.
+-- Corresponde a la sección 15.4.6 del informe.
+-- =====================================================================
+
 USE bd_protenat;
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- Workbench bloquea por defecto los UPDATE/DELETE sin clave en el WHERE.

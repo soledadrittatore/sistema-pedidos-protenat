@@ -1,7 +1,16 @@
+-- =====================================================================
+-- Sistema de Gestión de Pedidos para Clientes Comerciales de PROTENAT
+-- Base de datos: bd_protenat (MySQL 8)
+-- Parte 3: consultas asociadas a los casos de uso (C1 a C11).
+-- Corresponde a la sección 15.4.4 del informe.
+-- =====================================================================
+
 USE bd_protenat;
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- =====================================================================
 -- 3) CONSULTAS
+-- =====================================================================
 
 -- C1 (CU-02 Iniciar sesión): datos para validar el acceso y el perfil.
 SELECT id_usuario, email, activo, tipo_usuario

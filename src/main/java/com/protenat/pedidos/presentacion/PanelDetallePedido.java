@@ -10,7 +10,10 @@ import com.protenat.pedidos.dominio.DetallePedido;
 import com.protenat.pedidos.dominio.Pedido;
 import com.protenat.pedidos.util.Formato;
 
-/* Visualiza los dato de los datos y productos de un pedido. Puede ser usado por Mis pedidos y la bandeja administrativa. */
+/**
+ * Muestra los datos y productos de un pedido. Lo usan Mis pedidos (CU-05) y la
+ * bandeja administrativa (CU-06).
+ */
 public class PanelDetallePedido extends JPanel {
 
     private final JLabel lblEncabezado = new JLabel(" ");

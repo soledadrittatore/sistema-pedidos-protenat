@@ -1,0 +1,6 @@
+﻿N.° pedido;Cliente;CUIT/CUIL;Fecha;Total;Estado;Pago;Disponibilidad;Observaciones
+5;Peluquería Estilo Norte;30-71234567-8;12/10/2026 03:38;94000.00;PENDIENTE;PENDIENTE;PENDIENTE;
+4;Espacio Belleza;30-71876543-2;23/09/2026 12:20;98000.00;RECHAZADO;RECHAZADA;APROBADA;Pedido rechazado por inconveniente con el pago
+3;Peluquería Estilo Norte;30-71234567-8;22/09/2026 09:45;84000.00;CONFIRMADO;APROBADA;APROBADA;Pedido confirmado
+2;Bella Imagen;27-28456789-3;21/09/2026 11:15;92000.00;PENDIENTE;APROBADA;APROBADA;Pago y disponibilidad verificados
+1;Peluquería Estilo Norte;30-71234567-8;20/09/2026 10:30;86000.00;PENDIENTE;PENDIENTE;PENDIENTE;
